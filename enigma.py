@@ -1,68 +1,87 @@
 import numpy as np
 
+# read in rotors, reflector, and turnovers, and set rotors
 def getMachine():
-  # read in rotors, reflector, and turnovers
   rotors = np.genfromtxt('rotors.txt', dtype='str')
   reflector = np.genfromtxt('reflectors.txt', dtype='str')
   turnovers = np.genfromtxt('turnovers.txt', dtype='str')
 
-  # possible used rotors
-  rotor1 = [x for x in rotors[0]]
-  rotor2 = [x for x in rotors[1]]
-  rotor3 = [x for x in rotors[2]]
-  rotor4 = [x for x in rotors[3]]
-  rotor5 = [x for x in rotors[4]]
+  rotors = [list(x) for x in rotors]
+  reflector = [list(x) for x in reflector]
 
-  reflect1 = [x for x in reflector[0]] # UKW-A
-  reflect2 = [x for x in reflector[1]] # UKW-B
-  reflect3 = [x for x in reflector[2]] # UKW-C
+  return [rotors, reflector, turnovers]
 
-  return [rotor1, rotor2, rotor3, rotor4, rotor5, \
-    reflect1, reflect2, reflect3 , turnovers]
+# plugboard, creating a dictionary to map letters
+def makePlug(letterMap):
+  keys = [chr(i) for i in range(65,91)] # keys for dictionary, A-Z
+  plugboard = {}
+  for i in range(len(keys)): # looping to create dictionary
+    plugboard[keys[i]] = letterMap[i]
 
-rotor1, rotor2, rotor3, rotor4, rotor5, \
-  reflect1, reflect2, reflect3 , turnovers = getMachine()
+  return plugboard
 
-# user input
-userIn = raw_input("Input Message: ")
-userIn = [y.upper() for x in userIn for y in x]
+# rotor function
+def rotorFunction(char, rotors, turnovers, rotorNum, forward):
+  # rotating if the turnover is flipped or if it's the first rotor
+  if(rotorNum == 0 and forward == 1):
+    rotors[rotorNum].sort(key=rotors[rotorNum][0].__eq__)
+  if(forward == 1 and rotors[rotorNum][0] == turnovers[rotorNum]):
+    rotors[rotorNum+1].sort(key=rotors[rotorNum+1][0].__eq__)
 
-message = ""
-###########################
-# make a modular function #
-###########################
-for char in userIn:
-  if(char != " "):
-    # turning the first rotor
-    temp = rotor1[0]; rotor1 = rotor1[1:]; rotor1.append(temp)
+  if(forward == 1):
+    return [rotors,rotors[rotorNum][ord(char) - 65]]
+  elif(forward == 0):
+    ind = [i for i, x in enumerate(rotors[rotorNum]) if x == char][0]
+    return [rotors,chr(65 + ind)]
 
-    # turning second rotor if needed
-    if(rotor1[0] == turnovers[0]):
-      temp = rotor2[0]; rotor2 = rotor2[1:]; rotor2.append(temp)
-    # turning third rotor if needed
-    if(rotor2[0] == turnovers[1]):
-      temp = rotor3[0]; rotor3 = rotor3[1:]; rotor3.append(temp)
+def main(userIn,rotorNums,rotorPos,reflectNum,letterMap):
+  userIn = [y.upper() for x in userIn for y in x] # clean user input
 
+  # read in machine things
+  rotors, reflector, turnovers = getMachine()
+  # get plugboard dictionary
+  plugboard = makePlug(letterMap)
 
-    # encoding
-    r1Val = rotor1[ord(char) - 65] # first rotor
-    r2Val = rotor2[ord(r1Val) - 65] # second rotor
-    r3Val = rotor3[ord(r2Val) - 65] # third rotor
+  # machine settings
+  rotors = [rotors[ind] for ind in rotorNums]
+  turnovers = [turnovers[ind] for ind in rotorNums]
+  reflector = reflector[reflectNum]
 
-    # pass through reflector
-    reflectVal = reflect2[ord(r3Val) - 65] # UKW-B as default
+  # turn rotors to starting positions
+  for rotorNum in range(len(rotors)):
+    for i in range(rotorPos[rotorNum]-1):
+      rotors[rotorNum].sort(key=rotors[rotorNum][0].__eq__)
 
-    # pass backwards through rotors
-    ind = [i for i, x in enumerate(rotor3) if x == reflectVal][0]
-    r3ValR = chr(65 + ind)
-    ind = [i for i, x in enumerate(rotor2) if x == r3ValR][0]
-    r2ValR = chr(65 + ind)
-    ind = [i for i, x in enumerate(rotor1) if x == r2ValR][0]
-    r1ValR = chr(65 + ind)
+  message = ""
+  # pass through the machine
+  for char in userIn:
+    if(char != " "):
+      encoded = plugboard[char] # pass through plugboard first
+      for i in range(len(rotors)): # pass forwards
+        rotors, encoded = rotorFunction(encoded,rotors,turnovers,i,1)
 
-    message += r1ValR
+      # pass through reflector
+      encoded = reflector[ord(encoded) - 65]
 
-  elif(char == " "):
-    message += " "
+      for i in range(len(rotors)-1,-1,-1): # pass backwards
+        rotors, encoded = rotorFunction(encoded,rotors,turnovers,i,0)
 
-print("Output: "+message)
+      message += plugboard[encoded] # pass back through plugboard
+
+    elif(char == " "):
+      message += " "
+
+  return message
+
+# testing settings
+rotors = [0,1,2]
+reflector = 1 # only length 1
+rotorPos = [5,10,15] # must be same length as rotors
+letterMap = ['Z', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+'N', 'O', 'P', 'Q', 'S', 'R', 'T', 'U', 'V', 'W', 'X', 'Y','A'] # symmetric
+
+test = 'the quick brown fox jumped over the lazy dog'
+message = main(test,rotors,rotorPos,reflector,letterMap) # encode
+print(message)
+message = main(message,rotors,rotorPos,reflector,letterMap) # decode
+print(message)
